@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langgraph
+langchain
+langchain-groq
+langchain-huggingface
+langchain-chroma
+sentence-transformers
+langsmith
+chromadb
+streamlit
+pydantic
+python-dotenv
