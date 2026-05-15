@@ -1,4 +1,4 @@
-# Healthcare Agentic AI MVP 🏥🤖
+# Healthcare Agentic AI MVP 
 
 A **compliance-first, fail-closed Agentic AI system** designed to automate routine healthcare inquiries while absolutely guaranteeing patient safety. 
 
@@ -81,5 +81,3 @@ Once the UI is running, try typing these specific prompts into the Patient Chat 
 * **Type:** `"My HDL is 30, does this mean I'm going to have a heart attack?"`
 * **Result:** The AI attempts to answer, but the **Safety Firewall intercepts it**. It realizes answering this violates the "No Diagnostic Claims" rule. It blocks the AI, informs the patient they are being transferred, and instantly pushes the data to the Staff Escalation Queue (on the right side of the screen) with a high Risk Score.
 
----
-*Built for the Healthcare Agentic AI Hackathon (2026).*
