@@ -1,3 +1,4 @@
+import re
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_groq import ChatGroq
 from backend.state import AgentState
@@ -17,7 +18,11 @@ class OrchestratorOutput(BaseModel):
 def orchestrator_node(state: AgentState) -> dict:
     last_msg = state["messages"][-1].content
     
-    if EMERGENCY_REGEX.search(last_msg):
+    # Pre-processing PII Scrubbing
+    scrubbed_msg = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[REDACTED SSN]', last_msg)
+    scrubbed_msg = re.sub(r'\b\d{3}-\d{3}-\d{4}\b', '[REDACTED PHONE]', scrubbed_msg)
+    
+    if EMERGENCY_REGEX.search(scrubbed_msg):
         return {
             "current_intent": "emergency",
             "risk_score": 1.0,
@@ -25,7 +30,7 @@ def orchestrator_node(state: AgentState) -> dict:
             "escalation_reason": "Emergency keywords detected in patient input. Immediate clinical review required."
         }
     
-    prompt = f"Classify the intent of the following patient message:\n\n'{last_msg}'\n\nOptions: appointment, lab_report, prescription, insurance, general"
+    prompt = f"Classify the intent of the following patient message:\n\n'{scrubbed_msg}'\n\nOptions: appointment, lab_report, prescription, insurance, general"
     structured_llm = orchestrator_llm.with_structured_output(OrchestratorOutput)
     response = structured_llm.invoke(prompt)
     
@@ -65,6 +70,27 @@ def lab_report_node(state: AgentState) -> dict:
     res = llm.invoke([sys_prompt, HumanMessage(content=last_msg)])
     return {"messages": [res]}
 
+def prescription_node(state: AgentState) -> dict:
+    last_msg = state["messages"][-1].content
+    sys_prompt = SystemMessage(content=(
+        "You are a Prescription Validation Agent. "
+        "You assist the patient with prescription renewals and inquiries. "
+        "NEVER prescribe new medications. Only process renewals for existing prescriptions. "
+        "Always remind the patient that renewals require final clinical approval."
+    ))
+    res = llm.invoke([sys_prompt, HumanMessage(content=last_msg)])
+    return {"messages": [res]}
+
+def insurance_node(state: AgentState) -> dict:
+    last_msg = state["messages"][-1].content
+    sys_prompt = SystemMessage(content=(
+        "You are an Insurance Claims Agent. "
+        "You assist the patient with insurance coverage queries. "
+        "You cannot guarantee coverage or out-of-pocket costs, only provide general policy guidelines."
+    ))
+    res = llm.invoke([sys_prompt, HumanMessage(content=last_msg)])
+    return {"messages": [res]}
+
 class SafetyEvaluation(BaseModel):
     is_safe: bool = Field(description="True if safe to send to patient, False if violates ANY rule.")
     reason: str = Field(description="Reason for failure if is_safe is False, else empty string.")
@@ -99,7 +125,10 @@ def safety_node(state: AgentState) -> dict:
 def escalate_node(state: AgentState) -> dict:
     reason = state.get("escalation_reason")
     if not reason:
-        reason = f"Unhandled query domain: '{state.get('current_intent')}'. Safe routing to human staff."
+        if state.get("risk_score", 0.0) > 0.7:
+            reason = f"High risk score ({state.get('risk_score')}) detected for intent '{state.get('current_intent')}'. Direct escalation triggered."
+        else:
+            reason = f"Unhandled query domain: '{state.get('current_intent')}'. Safe routing to human staff."
 
     add_to_escalation_queue(
         patient_id=state["patient_id"],
