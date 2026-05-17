@@ -13,6 +13,8 @@ def calculate_risk(intent: str, message: str) -> float:
         risk += 0.9
     elif intent == "appointment":
         risk += 0.2
+    elif intent == "general":
+        risk += 0.5
     
     # Emergency check overrides
     if EMERGENCY_REGEX.search(message):

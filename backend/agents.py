@@ -97,11 +97,15 @@ def safety_node(state: AgentState) -> dict:
     return {"is_safe": eval_res.is_safe, "escalation_reason": eval_res.reason}
 
 def escalate_node(state: AgentState) -> dict:
+    reason = state.get("escalation_reason")
+    if not reason:
+        reason = f"Unhandled query domain: '{state.get('current_intent')}'. Safe routing to human staff."
+
     add_to_escalation_queue(
         patient_id=state["patient_id"],
         session_id=state["session_id"],
-        reason=state["escalation_reason"],
+        reason=reason,
         risk_score=state["risk_score"],
         messages=state["messages"]
     )
-    return {"messages": [AIMessage(content=f"For your safety and to ensure the most accurate care, this request has been securely escalated to our clinical staff. Reason for escalation: {state['escalation_reason']}")]}
+    return {"messages": [AIMessage(content=f"For your safety and to ensure the most accurate care, this request has been securely escalated to our clinical staff. Reason for escalation: {reason}")]}
